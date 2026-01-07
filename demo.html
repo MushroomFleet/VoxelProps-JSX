@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoxelProps — Optimized 3D Voxel Mesh Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --cyan: #00ffc8;
+      --cyan-dim: rgba(0, 255, 200, 0.6);
+      --cyan-faint: rgba(0, 255, 200, 0.2);
+      --cyan-glow: rgba(0, 255, 200, 0.3);
+      --green: #00ff88;
+      --magenta: #ff88ff;
+      --bg-dark: #0a0a12;
+      --bg-panel: rgba(0, 20, 15, 0.5);
+    }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-dark);
+      color: var(--cyan);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.1) 2px, rgba(0, 0, 0, 0.1) 4px);
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-dark); }
+    ::-webkit-scrollbar-thumb { background: var(--cyan-faint); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--cyan-dim); }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      background: var(--cyan-faint);
+      height: 4px;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    select {
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300ffc8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px !important;
+    }
+    select:hover { border-color: var(--cyan) !important; }
+
+    button:hover {
+      background: var(--cyan-faint) !important;
+      border-color: var(--cyan) !important;
+      color: var(--cyan) !important;
+    }
+
+    .demo-header {
+      text-align: center;
+      padding: 40px 20px;
+      border-bottom: 1px solid var(--cyan-faint);
+      background: linear-gradient(180deg, rgba(0, 255, 200, 0.05) 0%, transparent 100%);
+    }
+
+    .demo-header h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: 12px;
+      margin-bottom: 16px;
+      text-shadow: 0 0 20px var(--cyan-glow), 0 0 40px var(--cyan-glow);
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+      from { text-shadow: 0 0 20px var(--cyan-glow), 0 0 40px var(--cyan-glow); }
+      to { text-shadow: 0 0 30px var(--cyan-glow), 0 0 60px var(--cyan-glow), 0 0 80px rgba(0, 255, 200, 0.3); }
+    }
+
+    .demo-header p {
+      font-size: 14px;
+      letter-spacing: 4px;
+      color: var(--cyan-dim);
+      max-width: 700px;
+      margin: 0 auto;
+      line-height: 1.8;
+    }
+
+    .feature-badges {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 10px;
+      letter-spacing: 2px;
+      padding: 8px 16px;
+      border: 1px solid var(--cyan-faint);
+      background: rgba(0, 255, 200, 0.05);
+    }
+    .badge.highlight {
+      border-color: var(--green);
+      color: var(--green);
+      background: rgba(0, 255, 136, 0.1);
+    }
+
+    #demo-root {
+      padding: 40px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .optimization-section {
+      padding: 60px 20px;
+      border-top: 1px solid var(--cyan-faint);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .optimization-section h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      letter-spacing: 6px;
+      text-align: center;
+      margin-bottom: 16px;
+      color: var(--green);
+    }
+
+    .optimization-section .subtitle {
+      text-align: center;
+      font-size: 12px;
+      color: var(--cyan-dim);
+      margin-bottom: 40px;
+      letter-spacing: 2px;
+    }
+
+    .opt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 24px;
+    }
+
+    .opt-card {
+      padding: 24px;
+      border: 1px solid var(--cyan-faint);
+      background: var(--bg-panel);
+    }
+
+    .opt-card h3 {
+      font-size: 16px;
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .opt-card h3 .icon {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .opt-card p {
+      font-size: 12px;
+      line-height: 1.8;
+      color: var(--cyan-dim);
+      margin-bottom: 16px;
+    }
+
+    .opt-card .diagram {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 16px;
+      border: 1px solid rgba(0, 255, 200, 0.1);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .opt-card .diagram .before,
+    .opt-card .diagram .after {
+      display: inline-block;
+      margin-right: 24px;
+    }
+
+    .opt-card .diagram .label {
+      color: var(--cyan-dim);
+      margin-bottom: 8px;
+    }
+
+    .opt-card .diagram pre {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--cyan);
+    }
+
+    .opt-card .diagram .saved {
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    .features-section {
+      padding: 60px 20px;
+      border-top: 1px solid var(--cyan-faint);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .features-section h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      letter-spacing: 6px;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .feature-card {
+      padding: 24px;
+      border: 1px solid var(--cyan-faint);
+      background: var(--bg-panel);
+      transition: all 0.3s;
+    }
+
+    .feature-card:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 20px var(--cyan-glow);
+      transform: translateY(-4px);
+    }
+
+    .feature-card h3 {
+      font-size: 14px;
+      letter-spacing: 3px;
+      margin-bottom: 12px;
+    }
+
+    .feature-card p {
+      font-size: 12px;
+      line-height: 1.8;
+      color: var(--cyan-dim);
+    }
+
+    .demo-footer {
+      text-align: center;
+      padding: 40px 20px;
+      border-top: 1px solid var(--cyan-faint);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--cyan-dim);
+    }
+
+    @media (max-width: 768px) {
+      .demo-header h1 { font-size: 28px; letter-spacing: 6px; }
+      .feature-badges { gap: 8px; }
+      .badge { font-size: 9px; padding: 6px 12px; }
+      .opt-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="demo-header">
+    <h1>VOXELPROPS</h1>
+    <p>Optimized voxel mesh generation with hollow shell extraction and bilateral symmetry mirroring. Render only what's visible, define only half of symmetric models.</p>
+    <div class="feature-badges">
+      <span class="badge">32³ MAX RESOLUTION</span>
+      <span class="badge highlight">⚡ HOLLOW SHELL</span>
+      <span class="badge highlight">⟷ BILATERAL SYMMETRY</span>
+      <span class="badge">SVGA VERTEX SHADING</span>
+      <span class="badge">WIREFRAME RENDER</span>
+    </div>
+  </header>
+
+  <div id="demo-root"></div>
+
+  <section class="optimization-section">
+    <h2>⚡ OPTIMIZATIONS</h2>
+    <p class="subtitle">TWO KEY TECHNIQUES FOR DRAMATIC PERFORMANCE GAINS</p>
+    
+    <div class="opt-grid">
+      <div class="opt-card">
+        <h3><span class="icon">◯</span> HOLLOW SHELL EXTRACTION</h3>
+        <p>Interior voxels (surrounded on all 6 sides) contribute nothing to the visible mesh. By removing them before mesh generation, we reduce voxel count by 50-90% for solid shapes.</p>
+        <div class="diagram">
+          <div class="before">
+            <div class="label">BEFORE (Solid Cube 4³)</div>
+            <pre>████
+████
+████
+████</pre>
+            <div>64 voxels total</div>
+          </div>
+          <div class="after">
+            <div class="label">AFTER (Shell Only)</div>
+            <pre>████
+█  █
+█  █
+████</pre>
+            <div>56 voxels (shell)</div>
+          </div>
+          <div class="saved">↓ 8 interior voxels removed (12.5% saved)</div>
+          <div style="margin-top: 8px; color: var(--cyan-dim);">At 32³: ~87% of voxels are interior!</div>
+        </div>
+      </div>
+
+      <div class="opt-card">
+        <h3><span class="icon">⟷</span> BILATERAL SYMMETRY MIRRORING</h3>
+        <p>Most characters and objects are symmetrical. Define only the left half, then mirror vertices at render time. Halves model definition work and memory for geometry.</p>
+        <div class="diagram">
+          <div class="before">
+            <div class="label">TRADITIONAL (Full Model)</div>
+            <pre>  ██  
+ ████ 
+██████
+ █  █ </pre>
+            <div>Define all 16 boxes</div>
+          </div>
+          <div class="after">
+            <div class="label">MIRRORED (Half + Flip)</div>
+            <pre>  █│  
+ ██│  
+███│  
+ █ │  </pre>
+            <div>Define 8, mirror to 16</div>
+          </div>
+          <div class="saved">↓ 50% less model definition code</div>
+          <div style="margin-top: 8px; color: var(--cyan-dim);">Mesh vertices doubled at render (GPU cheap)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features-section">
+    <h2>SYSTEM FEATURES</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <h3>VOXEL ENGINE</h3>
+        <p>Uint8Array grid storage with O(1) voxel access. Exterior surface extraction generates only visible faces. Supports up to 32³ (32,768) voxels.</p>
+      </div>
+      <div class="feature-card">
+        <h3>WIREFRAME MODE</h3>
+        <p>Toggle wireframe overlay with duplicate edge elimination. Visualize mesh topology and face structure in real-time.</p>
+      </div>
+      <div class="feature-card">
+        <h3>SVGA SHADING</h3>
+        <p>Per-face lighting with adjustable light direction. Three-tone color palettes (shadow, base, highlight) create classic SVGA vertex shading.</p>
+      </div>
+      <div class="feature-card">
+        <h3>PRESET MODELS</h3>
+        <p>7 built-in models: Human, Robot, Car, Tree, House, Cube, Sphere. Symmetric models marked with ⟷ use bilateral mirroring.</p>
+      </div>
+      <div class="feature-card">
+        <h3>COLOR PALETTES</h3>
+        <p>Three distinct palettes: Default (natural tones), Cyberpunk (neon), Retro (vintage). Each defines 17+ material colors.</p>
+      </div>
+      <div class="feature-card">
+        <h3>INTERACTIVE VIEW</h3>
+        <p>Drag to rotate, scroll to zoom, auto-rotate mode. Full 4x4 transformation matrix stack with perspective projection.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="demo-footer">
+    VOXELPROPS • OPTIMIZED MESH GENERATION • HOLLOW SHELL + BILATERAL SYMMETRY
+  </footer>
+
+  <script type="text/babel">
+    // ============================================================================
+    // VOXEL ENGINE - OPTIMIZED
+    // ============================================================================
+
+    const VoxelEngine = {
+      createGrid: (size) => {
+        const grid = new Uint8Array(size * size * size);
+        return { data: grid, size, symmetric: false };
+      },
+
+      setVoxel: (grid, x, y, z, value) => {
+        if (x >= 0 && x < grid.size && y >= 0 && y < grid.size && z >= 0 && z < grid.size) {
+          grid.data[x + y * grid.size + z * grid.size * grid.size] = value;
+        }
+      },
+
+      getVoxel: (grid, x, y, z) => {
+        if (x >= 0 && x < grid.size && y >= 0 && y < grid.size && z >= 0 && z < grid.size) {
+          return grid.data[x + y * grid.size + z * grid.size * grid.size];
+        }
+        return 0;
+      },
+
+      isInterior: (grid, x, y, z) => {
+        return (
+          VoxelEngine.getVoxel(grid, x + 1, y, z) !== 0 &&
+          VoxelEngine.getVoxel(grid, x - 1, y, z) !== 0 &&
+          VoxelEngine.getVoxel(grid, x, y + 1, z) !== 0 &&
+          VoxelEngine.getVoxel(grid, x, y - 1, z) !== 0 &&
+          VoxelEngine.getVoxel(grid, x, y, z + 1) !== 0 &&
+          VoxelEngine.getVoxel(grid, x, y, z - 1) !== 0
+        );
+      },
+
+      hollowGrid: (grid) => {
+        const { size } = grid;
+        const hollow = new Uint8Array(size * size * size);
+        let removed = 0, kept = 0;
+
+        for (let z = 0; z < size; z++) {
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+              const voxel = VoxelEngine.getVoxel(grid, x, y, z);
+              if (voxel !== 0) {
+                if (!VoxelEngine.isInterior(grid, x, y, z)) {
+                  hollow[x + y * size + z * size * size] = voxel;
+                  kept++;
+                } else {
+                  removed++;
+                }
+              }
+            }
+          }
+        }
+
+        return { data: hollow, size, symmetric: grid.symmetric, stats: { removed, kept } };
+      },
+
+      mirrorGrid: (grid) => {
+        if (!grid.symmetric) return grid;
+        const { size } = grid;
+        const center = Math.floor(size / 2);
+        
+        for (let z = 0; z < size; z++) {
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < center; x++) {
+              const voxel = VoxelEngine.getVoxel(grid, x, y, z);
+              if (voxel !== 0) {
+                VoxelEngine.setVoxel(grid, size - 1 - x, y, z, voxel);
+              }
+            }
+          }
+        }
+        return grid;
+      },
+
+      isFaceVisible: (grid, x, y, z, dx, dy, dz) => {
+        return VoxelEngine.getVoxel(grid, x + dx, y + dy, z + dz) === 0;
+      },
+
+      generateMesh: (grid, useSymmetryOpt = true) => {
+        const vertices = [];
+        const faces = [];
+        const colors = [];
+        const { size, symmetric } = grid;
+        
+        const faceTemplates = {
+          top:    { verts: [[0,1,0], [1,1,0], [1,1,1], [0,1,1]] },
+          bottom: { verts: [[0,0,1], [1,0,1], [1,0,0], [0,0,0]] },
+          front:  { verts: [[0,0,1], [0,1,1], [1,1,1], [1,0,1]] },
+          back:   { verts: [[1,0,0], [1,1,0], [0,1,0], [0,0,0]] },
+          right:  { verts: [[1,0,1], [1,1,1], [1,1,0], [1,0,0]] },
+          left:   { verts: [[0,0,0], [0,1,0], [0,1,1], [0,0,1]] }
+        };
+
+        const xEnd = (symmetric && useSymmetryOpt) ? Math.ceil(size / 2) : size;
+
+        for (let z = 0; z < size; z++) {
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < xEnd; x++) {
+              const voxel = VoxelEngine.getVoxel(grid, x, y, z);
+              if (voxel === 0) continue;
+
+              const checks = [
+                { face: 'top', dx: 0, dy: 1, dz: 0 },
+                { face: 'bottom', dx: 0, dy: -1, dz: 0 },
+                { face: 'front', dx: 0, dy: 0, dz: 1 },
+                { face: 'back', dx: 0, dy: 0, dz: -1 },
+                { face: 'right', dx: 1, dy: 0, dz: 0 },
+                { face: 'left', dx: -1, dy: 0, dz: 0 }
+              ];
+
+              checks.forEach(({ face, dx, dy, dz }) => {
+                if (VoxelEngine.isFaceVisible(grid, x, y, z, dx, dy, dz)) {
+                  const template = faceTemplates[face];
+                  const baseIndex = vertices.length / 3;
+                  
+                  template.verts.forEach(([vx, vy, vz]) => {
+                    vertices.push(x + vx, y + vy, z + vz);
+                  });
+
+                  faces.push(baseIndex, baseIndex + 1, baseIndex + 2);
+                  faces.push(baseIndex, baseIndex + 2, baseIndex + 3);
+
+                  for (let i = 0; i < 4; i++) colors.push(voxel);
+                }
+              });
+            }
+          }
+        }
+
+        if (symmetric && useSymmetryOpt) {
+          const origVertCount = vertices.length / 3;
+          const origFaceCount = faces.length;
+          
+          for (let i = 0; i < origVertCount; i++) {
+            vertices.push(size - vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2]);
+            colors.push(colors[i]);
+          }
+          
+          for (let i = 0; i < origFaceCount; i += 3) {
+            faces.push(faces[i] + origVertCount, faces[i + 2] + origVertCount, faces[i + 1] + origVertCount);
+          }
+        }
+
+        return { vertices, faces, colors, size, symmetric };
+      }
+    };
+
+    // ============================================================================
+    // MODELS - SYMMETRIC (LEFT HALF ONLY)
+    // ============================================================================
+
+    const VoxelModels = {
+      human: (grid) => {
+        const s = grid.size, scale = s / 32;
+        grid.symmetric = true;
+        
+        const box = (x1, y1, z1, x2, y2, z2, c) => {
+          for (let x = Math.floor(x1 * scale); x < Math.floor(x2 * scale); x++)
+            for (let y = Math.floor(y1 * scale); y < Math.floor(y2 * scale); y++)
+              for (let z = Math.floor(z1 * scale); z < Math.floor(z2 * scale); z++)
+                VoxelEngine.setVoxel(grid, x, y, z, c);
+        };
+        
+        box(13, 24, 13, 16, 32, 19, 1);
+        box(11, 12, 12, 16, 24, 20, 2);
+        box(6, 12, 13, 11, 24, 19, 2);
+        box(6, 8, 13, 11, 12, 19, 1);
+        box(11, 0, 13, 16, 12, 19, 3);
+        box(13, 28, 12, 16, 32, 13, 4);
+        box(12, 28, 13, 13, 32, 19, 4);
+
+        VoxelEngine.mirrorGrid(grid);
+        return grid;
+      },
+
+      robot: (grid) => {
+        const s = grid.size, scale = s / 32;
+        grid.symmetric = true;
+        
+        const box = (x1, y1, z1, x2, y2, z2, c) => {
+          for (let x = Math.floor(x1 * scale); x < Math.floor(x2 * scale); x++)
+            for (let y = Math.floor(y1 * scale); y < Math.floor(y2 * scale); y++)
+              for (let z = Math.floor(z1 * scale); z < Math.floor(z2 * scale); z++)
+                VoxelEngine.setVoxel(grid, x, y, z, c);
+        };
+
+        box(12, 24, 12, 16, 32, 20, 16);
+        box(13, 27, 11, 15, 29, 12, 13);
+        box(10, 10, 10, 16, 24, 22, 16);
+        box(14, 14, 9, 16, 20, 10, 17);
+        box(4, 10, 12, 10, 24, 20, 16);
+        box(4, 6, 13, 10, 10, 19, 12);
+        box(10, 0, 12, 15, 10, 20, 16);
+        box(15, 32, 15, 16, 36, 17, 12);
+        box(14, 36, 14, 16, 38, 18, 17);
+
+        VoxelEngine.mirrorGrid(grid);
+        return grid;
+      },
+
+      car: (grid) => {
+        const s = grid.size, scale = s / 32;
+        grid.symmetric = true;
+        
+        const box = (x1, y1, z1, x2, y2, z2, c) => {
+          for (let x = Math.floor(x1 * scale); x < Math.floor(x2 * scale); x++)
+            for (let y = Math.floor(y1 * scale); y < Math.floor(y2 * scale); y++)
+              for (let z = Math.floor(z1 * scale); z < Math.floor(z2 * scale); z++)
+                VoxelEngine.setVoxel(grid, x, y, z, c);
+        };
+
+        box(4, 4, 10, 16, 10, 22, 9);
+        box(10, 10, 11, 16, 16, 21, 10);
+        box(11, 11, 11, 16, 15, 12, 11);
+        box(11, 11, 20, 16, 15, 21, 11);
+        box(6, 2, 8, 10, 6, 12, 12);
+        box(6, 2, 20, 10, 6, 24, 12);
+        box(4, 6, 12, 5, 8, 14, 13);
+        box(4, 6, 18, 5, 8, 20, 13);
+
+        VoxelEngine.mirrorGrid(grid);
+        return grid;
+      },
+
+      tree: (grid) => {
+        const s = grid.size, scale = s / 32;
+        grid.symmetric = true;
+        
+        const box = (x1, y1, z1, x2, y2, z2, c) => {
+          for (let x = Math.floor(x1 * scale); x < Math.floor(x2 * scale); x++)
+            for (let y = Math.floor(y1 * scale); y < Math.floor(y2 * scale); y++)
+              for (let z = Math.floor(z1 * scale); z < Math.floor(z2 * scale); z++)
+                VoxelEngine.setVoxel(grid, x, y, z, c);
+        };
+
+        box(14, 0, 14, 16, 16, 18, 7);
+        box(8, 16, 8, 16, 22, 24, 8);
+        box(10, 22, 10, 16, 28, 22, 8);
+        box(12, 28, 12, 16, 32, 20, 8);
+
+        VoxelEngine.mirrorGrid(grid);
+        return grid;
+      },
+
+      house: (grid) => {
+        const s = grid.size, scale = s / 32;
+        grid.symmetric = true;
+        
+        const box = (x1, y1, z1, x2, y2, z2, c) => {
+          for (let x = Math.floor(x1 * scale); x < Math.floor(x2 * scale); x++)
+            for (let y = Math.floor(y1 * scale); y < Math.floor(y2 * scale); y++)
+              for (let z = Math.floor(z1 * scale); z < Math.floor(z2 * scale); z++)
+                VoxelEngine.setVoxel(grid, x, y, z, c);
+        };
+
+        box(4, 0, 8, 16, 18, 24, 14);
+        box(6, 0, 10, 16, 16, 22, 0);
+        for (let i = 0; i < 8; i++) box(4 + i, 18 + i, 6, 16, 20 + i, 26, 15);
+        box(14, 0, 7, 16, 10, 8, 7);
+        box(7, 8, 7, 11, 14, 8, 11);
+
+        VoxelEngine.mirrorGrid(grid);
+        return grid;
+      },
+
+      cube: (grid) => {
+        const s = grid.size, margin = Math.floor(s * 0.25);
+        grid.symmetric = false;
+        for (let x = margin; x < s - margin; x++)
+          for (let y = margin; y < s - margin; y++)
+            for (let z = margin; z < s - margin; z++)
+              VoxelEngine.setVoxel(grid, x, y, z, 5);
+        return grid;
+      },
+
+      sphere: (grid) => {
+        const s = grid.size, center = s / 2, radius = s * 0.4;
+        grid.symmetric = false;
+        for (let x = 0; x < s; x++)
+          for (let y = 0; y < s; y++)
+            for (let z = 0; z < s; z++) {
+              const dx = x - center + 0.5, dy = y - center + 0.5, dz = z - center + 0.5;
+              if (dx*dx + dy*dy + dz*dz <= radius*radius)
+                VoxelEngine.setVoxel(grid, x, y, z, 6);
+            }
+        return grid;
+      }
+    };
+
+    // ============================================================================
+    // COLOR PALETTES
+    // ============================================================================
+
+    const ColorPalettes = {
+      default: {
+        1: { base: '#FFD5B8', highlight: '#FFF0E0', shadow: '#C9A088' },
+        2: { base: '#4A90D9', highlight: '#7AB8FF', shadow: '#2A5080' },
+        3: { base: '#3D5C8C', highlight: '#5A80B0', shadow: '#253850' },
+        4: { base: '#4A3728', highlight: '#6B5040', shadow: '#2A1F18' },
+        5: { base: '#E8E8E8', highlight: '#FFFFFF', shadow: '#B0B0B0' },
+        6: { base: '#FF6B6B', highlight: '#FF9999', shadow: '#CC4444' },
+        7: { base: '#8B5A2B', highlight: '#A67B4B', shadow: '#5C3A1B' },
+        8: { base: '#228B22', highlight: '#44AA44', shadow: '#145014' },
+        9: { base: '#DC143C', highlight: '#FF3355', shadow: '#AA0022' },
+        10: { base: '#C0C0C0', highlight: '#E0E0E0', shadow: '#909090' },
+        11: { base: '#4169E1', highlight: '#6688FF', shadow: '#2244AA' },
+        12: { base: '#2F2F2F', highlight: '#4F4F4F', shadow: '#1F1F1F' },
+        13: { base: '#FFD700', highlight: '#FFEE55', shadow: '#CCA800' },
+        14: { base: '#DEB887', highlight: '#F0D8A8', shadow: '#B09060' },
+        15: { base: '#8B4513', highlight: '#A86030', shadow: '#5C2E0A' },
+        16: { base: '#708090', highlight: '#90A0B0', shadow: '#505868' },
+        17: { base: '#00FF88', highlight: '#55FFAA', shadow: '#00AA55' },
+      },
+      cyberpunk: {
+        1: { base: '#E0C0FF', highlight: '#FFE0FF', shadow: '#A080C0' },
+        2: { base: '#00FFFF', highlight: '#88FFFF', shadow: '#008888' },
+        3: { base: '#FF00FF', highlight: '#FF88FF', shadow: '#880088' },
+        4: { base: '#000000', highlight: '#333333', shadow: '#000000' },
+        5: { base: '#FFFFFF', highlight: '#FFFFFF', shadow: '#AAAAAA' },
+        6: { base: '#FF0080', highlight: '#FF55AA', shadow: '#AA0055' },
+        7: { base: '#333333', highlight: '#555555', shadow: '#111111' },
+        8: { base: '#00FF00', highlight: '#88FF88', shadow: '#008800' },
+        9: { base: '#FF0000', highlight: '#FF5555', shadow: '#AA0000' },
+        10: { base: '#808080', highlight: '#AAAAAA', shadow: '#555555' },
+        11: { base: '#0088FF', highlight: '#55AAFF', shadow: '#005599' },
+        12: { base: '#1A1A1A', highlight: '#333333', shadow: '#000000' },
+        13: { base: '#FFFF00', highlight: '#FFFF88', shadow: '#888800' },
+        14: { base: '#404040', highlight: '#606060', shadow: '#202020' },
+        15: { base: '#660066', highlight: '#880088', shadow: '#440044' },
+        16: { base: '#404050', highlight: '#606080', shadow: '#303040' },
+        17: { base: '#00FFAA', highlight: '#55FFCC', shadow: '#00AA77' },
+      },
+      retro: {
+        1: { base: '#F5CEB8', highlight: '#FFE8D8', shadow: '#C0A090' },
+        2: { base: '#5B8930', highlight: '#7BA950', shadow: '#3B6920' },
+        3: { base: '#8B4513', highlight: '#AB6533', shadow: '#5B2503' },
+        4: { base: '#2F1810', highlight: '#4F3830', shadow: '#1F0800' },
+        5: { base: '#FFFEF0', highlight: '#FFFFF8', shadow: '#D0D0C0' },
+        6: { base: '#D2691E', highlight: '#E8893E', shadow: '#A24900' },
+        7: { base: '#654321', highlight: '#856341', shadow: '#452311' },
+        8: { base: '#228B22', highlight: '#44AB42', shadow: '#106B10' },
+        9: { base: '#B22222', highlight: '#D24242', shadow: '#921212' },
+        10: { base: '#C0B0A0', highlight: '#E0D0C0', shadow: '#A09080' },
+        11: { base: '#87CEEB', highlight: '#A7EEFF', shadow: '#67AECB' },
+        12: { base: '#3C3C3C', highlight: '#5C5C5C', shadow: '#1C1C1C' },
+        13: { base: '#FFD700', highlight: '#FFF720', shadow: '#DFB700' },
+        14: { base: '#D2B48C', highlight: '#F2D4AC', shadow: '#B2946C' },
+        15: { base: '#A0522D', highlight: '#C0724D', shadow: '#80321D' },
+        16: { base: '#696969', highlight: '#898989', shadow: '#494949' },
+        17: { base: '#ADFF2F', highlight: '#CDFF5F', shadow: '#8DDF1F' },
+      }
+    };
+
+    // ============================================================================
+    // MATRIX & RENDERER
+    // ============================================================================
+
+    const Matrix = {
+      identity: () => [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+      multiply: (a, b) => {
+        const r = new Array(16).fill(0);
+        for (let i = 0; i < 4; i++)
+          for (let j = 0; j < 4; j++)
+            for (let k = 0; k < 4; k++)
+              r[i*4+j] += a[i*4+k] * b[k*4+j];
+        return r;
+      },
+      rotateX: (a) => { const c = Math.cos(a), s = Math.sin(a); return [1,0,0,0, 0,c,-s,0, 0,s,c,0, 0,0,0,1]; },
+      rotateY: (a) => { const c = Math.cos(a), s = Math.sin(a); return [c,0,s,0, 0,1,0,0, -s,0,c,0, 0,0,0,1]; },
+      translate: (x,y,z) => [1,0,0,x, 0,1,0,y, 0,0,1,z, 0,0,0,1],
+      scale: (s) => [s,0,0,0, 0,s,0,0, 0,0,s,0, 0,0,0,1],
+      transformPoint: (m, p) => {
+        const w = m[12]*p[0] + m[13]*p[1] + m[14]*p[2] + m[15];
+        return [(m[0]*p[0]+m[1]*p[1]+m[2]*p[2]+m[3])/w, (m[4]*p[0]+m[5]*p[1]+m[6]*p[2]+m[7])/w, (m[8]*p[0]+m[9]*p[1]+m[10]*p[2]+m[11])/w];
+      }
+    };
+
+    const Renderer = {
+      render: (ctx, mesh, transform, opts) => {
+        const { width, height, wireframe, showFaces, palette, lightDir, ambient } = opts;
+        if (!mesh || mesh.vertices.length === 0) return;
+
+        const colors = ColorPalettes[palette] || ColorPalettes.default;
+        
+        const verts = [];
+        for (let i = 0; i < mesh.vertices.length; i += 3) {
+          const p = Matrix.transformPoint(transform, [mesh.vertices[i], mesh.vertices[i+1], mesh.vertices[i+2]]);
+          verts.push({ x: (p[0]+1)*width/2, y: (1-p[1])*height/2, z: p[2] });
+        }
+
+        const faceList = [];
+        for (let i = 0; i < mesh.faces.length; i += 3) {
+          const [i0, i1, i2] = [mesh.faces[i], mesh.faces[i+1], mesh.faces[i+2]];
+          const [v0, v1, v2] = [verts[i0], verts[i1], verts[i2]];
+          
+          const cross = (v1.x-v0.x)*(v2.y-v0.y) - (v1.y-v0.y)*(v2.x-v0.x);
+          if (cross < 0) continue;
+
+          const p0 = [mesh.vertices[i0*3], mesh.vertices[i0*3+1], mesh.vertices[i0*3+2]];
+          const p1 = [mesh.vertices[i1*3], mesh.vertices[i1*3+1], mesh.vertices[i1*3+2]];
+          const p2 = [mesh.vertices[i2*3], mesh.vertices[i2*3+1], mesh.vertices[i2*3+2]];
+          const e1 = [p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]];
+          const e2 = [p2[0]-p0[0], p2[1]-p0[1], p2[2]-p0[2]];
+          const n = [e1[1]*e2[2]-e1[2]*e2[1], e1[2]*e2[0]-e1[0]*e2[2], e1[0]*e2[1]-e1[1]*e2[0]];
+          const len = Math.sqrt(n[0]**2+n[1]**2+n[2]**2);
+          if (len > 0) { n[0]/=len; n[1]/=len; n[2]/=len; }
+          
+          const dot = Math.max(0, n[0]*lightDir[0]+n[1]*lightDir[1]+n[2]*lightDir[2]);
+          const intensity = ambient + (1-ambient)*dot;
+
+          faceList.push({ verts: [v0,v1,v2], z: (v0.z+v1.z+v2.z)/3, intensity, colorIndex: mesh.colors[i0]||1, indices: [i0,i1,i2] });
+        }
+
+        faceList.sort((a,b) => b.z - a.z);
+
+        if (showFaces) {
+          faceList.forEach(f => {
+            const c = colors[f.colorIndex] || colors[1];
+            let col;
+            if (f.intensity < 0.5) {
+              const t = f.intensity * 2;
+              col = Renderer.lerp(c.shadow, c.base, t);
+            } else {
+              const t = (f.intensity - 0.5) * 2;
+              col = Renderer.lerp(c.base, c.highlight, t);
+            }
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.moveTo(f.verts[0].x, f.verts[0].y);
+            ctx.lineTo(f.verts[1].x, f.verts[1].y);
+            ctx.lineTo(f.verts[2].x, f.verts[2].y);
+            ctx.closePath();
+            ctx.fill();
+          });
+        }
+
+        if (wireframe) {
+          ctx.strokeStyle = opts.wireframeColor;
+          ctx.lineWidth = 1;
+          const drawn = new Set();
+          faceList.forEach(f => {
+            [[f.indices[0],f.indices[1]], [f.indices[1],f.indices[2]], [f.indices[2],f.indices[0]]].forEach(([a,b]) => {
+              const k = a<b ? `${a}-${b}` : `${b}-${a}`;
+              if (drawn.has(k)) return;
+              drawn.add(k);
+              ctx.beginPath();
+              ctx.moveTo(verts[a].x, verts[a].y);
+              ctx.lineTo(verts[b].x, verts[b].y);
+              ctx.stroke();
+            });
+          });
+        }
+      },
+
+      lerp: (c1, c2, t) => {
+        const [r1,g1,b1] = [parseInt(c1.slice(1,3),16), parseInt(c1.slice(3,5),16), parseInt(c1.slice(5,7),16)];
+        const [r2,g2,b2] = [parseInt(c2.slice(1,3),16), parseInt(c2.slice(3,5),16), parseInt(c2.slice(5,7),16)];
+        return `rgb(${Math.round(r1+(r2-r1)*t)}, ${Math.round(g1+(g2-g1)*t)}, ${Math.round(b1+(b2-b1)*t)})`;
+      }
+    };
+
+    // ============================================================================
+    // VOXEL PROPS COMPONENT
+    // ============================================================================
+
+    const VoxelProps = ({ initialModel = 'human', initialResolution = 16, initialPalette = 'default', width = 500, height = 500, autoRotate = true }) => {
+      const canvasRef = React.useRef(null);
+      const animRef = React.useRef(null);
+      
+      const [model, setModel] = React.useState(initialModel);
+      const [resolution, setResolution] = React.useState(initialResolution);
+      const [palette, setPalette] = React.useState(initialPalette);
+      const [wireframe, setWireframe] = React.useState(true);
+      const [showFaces, setShowFaces] = React.useState(true);
+      const [rotation, setRotation] = React.useState({ x: -0.4, y: 0.5 });
+      const [zoom, setZoom] = React.useState(1.5);
+      const [isRotating, setIsRotating] = React.useState(autoRotate);
+      const [lightAngle, setLightAngle] = React.useState(45);
+      const [isDragging, setIsDragging] = React.useState(false);
+      const [lastMouse, setLastMouse] = React.useState({ x: 0, y: 0 });
+      const [stats, setStats] = React.useState({ voxels: 0, shellVoxels: 0, vertices: 0, faces: 0, savedPercent: 0, symmetric: false });
+      const [useHollow, setUseHollow] = React.useState(true);
+      const [useSymmetry, setUseSymmetry] = React.useState(true);
+
+      const mesh = React.useMemo(() => {
+        let grid = VoxelEngine.createGrid(resolution);
+        
+        switch (model) {
+          case 'human': VoxelModels.human(grid); break;
+          case 'robot': VoxelModels.robot(grid); break;
+          case 'car': VoxelModels.car(grid); break;
+          case 'tree': VoxelModels.tree(grid); break;
+          case 'house': VoxelModels.house(grid); break;
+          case 'cube': VoxelModels.cube(grid); break;
+          case 'sphere': VoxelModels.sphere(grid); break;
+          default: VoxelModels.cube(grid);
+        }
+        
+        let origVoxels = 0;
+        for (let i = 0; i < grid.data.length; i++) if (grid.data[i] !== 0) origVoxels++;
+        
+        let hollowStats = { kept: origVoxels };
+        if (useHollow) {
+          const result = VoxelEngine.hollowGrid(grid);
+          grid = result;
+          hollowStats = result.stats;
+        }
+        
+        const m = VoxelEngine.generateMesh(grid, useSymmetry);
+        
+        setStats({
+          voxels: origVoxels,
+          shellVoxels: hollowStats.kept,
+          vertices: m.vertices.length / 3,
+          faces: m.faces.length / 3,
+          savedPercent: origVoxels > 0 ? Math.round(((origVoxels - hollowStats.kept) / origVoxels) * 100) : 0,
+          symmetric: grid.symmetric
+        });
+        
+        return m;
+      }, [model, resolution, useHollow, useSymmetry]);
+
+      React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let rot = rotation.y;
+
+        const render = () => {
+          ctx.fillStyle = '#0a0a12';
+          ctx.fillRect(0, 0, width, height);
+
+          ctx.strokeStyle = 'rgba(0, 255, 200, 0.1)';
+          for (let i = 0; i <= 20; i++) {
+            ctx.beginPath(); ctx.moveTo(i*width/20, height*0.7); ctx.lineTo(i*width/20, height); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, height*0.7+i*height*0.015); ctx.lineTo(width, height*0.7+i*height*0.015); ctx.stroke();
+          }
+
+          if (isRotating) rot += 0.01;
+
+          const c = mesh.size / 2;
+          let t = Matrix.identity();
+          t = Matrix.multiply(Matrix.translate(-c, -c, -c), t);
+          t = Matrix.multiply(Matrix.scale(zoom / mesh.size), t);
+          t = Matrix.multiply(Matrix.rotateX(rotation.x), t);
+          t = Matrix.multiply(Matrix.rotateY(isRotating ? rot : rotation.y), t);
+          t = Matrix.multiply(Matrix.translate(0, -0.1, 0), t);
+
+          const lr = lightAngle * Math.PI / 180;
+          const ld = [Math.cos(lr)*0.7, 0.5, Math.sin(lr)*0.7];
+          const ll = Math.sqrt(ld[0]**2+ld[1]**2+ld[2]**2);
+          ld[0]/=ll; ld[1]/=ll; ld[2]/=ll;
+
+          Renderer.render(ctx, mesh, t, { width, height, wireframe, showFaces, palette, lightDir: ld, ambient: 0.3, wireframeColor: 'rgba(0, 255, 200, 0.5)' });
+
+          animRef.current = requestAnimationFrame(render);
+        };
+
+        render();
+        return () => cancelAnimationFrame(animRef.current);
+      }, [mesh, rotation, zoom, wireframe, showFaces, palette, isRotating, lightAngle, width, height]);
+
+      const handleMouseDown = (e) => { setIsDragging(true); setLastMouse({ x: e.clientX, y: e.clientY }); setIsRotating(false); };
+      const handleMouseMove = (e) => { if (!isDragging) return; setRotation(p => ({ x: Math.max(-Math.PI/2, Math.min(Math.PI/2, p.x + (e.clientY-lastMouse.y)*0.01)), y: p.y + (e.clientX-lastMouse.x)*0.01 })); setLastMouse({ x: e.clientX, y: e.clientY }); };
+      const handleMouseUp = () => setIsDragging(false);
+      const handleWheel = (e) => { e.preventDefault(); setZoom(p => Math.max(0.5, Math.min(4, p - e.deltaY*0.001))); };
+
+      const styles = {
+        container: { fontFamily: '"JetBrains Mono", monospace', backgroundColor: '#0a0a12', color: '#00ffc8', padding: '24px' },
+        main: { display: 'flex', gap: '24px', justifyContent: 'center', flexWrap: 'wrap' },
+        canvasWrapper: { position: 'relative', border: '1px solid rgba(0,255,200,0.3)', boxShadow: '0 0 40px rgba(0,255,200,0.1)' },
+        canvas: { display: 'block', cursor: 'grab' },
+        stats: { position: 'absolute', top: '12px', left: '12px', fontSize: '10px', letterSpacing: '2px', lineHeight: '1.8', color: 'rgba(0,255,200,0.7)' },
+        hint: { position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)', fontSize: '10px', letterSpacing: '2px', color: 'rgba(0,255,200,0.4)' },
+        controls: { display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '240px', padding: '20px', backgroundColor: 'rgba(0,20,15,0.5)', border: '1px solid rgba(0,255,200,0.2)' },
+        controlGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
+        label: { fontSize: '11px', letterSpacing: '2px', color: 'rgba(0,255,200,0.6)' },
+        select: { backgroundColor: '#0a0a12', color: '#00ffc8', border: '1px solid rgba(0,255,200,0.3)', padding: '10px 12px', fontSize: '13px', fontFamily: 'inherit', cursor: 'pointer' },
+        toggleGroup: { display: 'flex', gap: '8px' },
+        toggleButton: { flex: 1, backgroundColor: 'transparent', color: 'rgba(0,255,200,0.5)', border: '1px solid rgba(0,255,200,0.3)', padding: '10px 8px', fontSize: '10px', letterSpacing: '1px', fontFamily: 'inherit', cursor: 'pointer' },
+        toggleActive: { backgroundColor: 'rgba(0,255,200,0.1)', color: '#00ffc8', borderColor: '#00ffc8', boxShadow: '0 0 10px rgba(0,255,200,0.3)' },
+      };
+
+      return (
+        <div style={styles.container}>
+          <div style={styles.main}>
+            <div style={styles.canvasWrapper}>
+              <canvas ref={canvasRef} width={width} height={height} style={styles.canvas} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onWheel={handleWheel} />
+              <div style={styles.stats}>
+                <div>ORIGINAL: {stats.voxels} voxels</div>
+                <div>SHELL: {stats.shellVoxels} voxels</div>
+                <div style={{ color: '#00ff88' }}>SAVED: {stats.savedPercent}%</div>
+                <div>VERTICES: {stats.vertices}</div>
+                <div>FACES: {stats.faces}</div>
+                {stats.symmetric && <div style={{ color: '#ff88ff' }}>⟷ SYMMETRIC</div>}
+              </div>
+              <div style={styles.hint}>DRAG TO ROTATE • SCROLL TO ZOOM</div>
+            </div>
+
+            <div style={styles.controls}>
+              <div style={styles.controlGroup}>
+                <label style={styles.label}>MODEL</label>
+                <select value={model} onChange={(e) => setModel(e.target.value)} style={styles.select}>
+                  <option value="human">Human ⟷</option>
+                  <option value="robot">Robot ⟷</option>
+                  <option value="car">Car ⟷</option>
+                  <option value="tree">Tree ⟷</option>
+                  <option value="house">House ⟷</option>
+                  <option value="cube">Cube</option>
+                  <option value="sphere">Sphere</option>
+                </select>
+              </div>
+
+              <div style={styles.controlGroup}>
+                <label style={styles.label}>RESOLUTION: {resolution}³</label>
+                <input type="range" min="4" max="32" step="2" value={resolution} onChange={(e) => setResolution(parseInt(e.target.value))} />
+              </div>
+
+              <div style={styles.controlGroup}>
+                <label style={styles.label}>PALETTE</label>
+                <select value={palette} onChange={(e) => setPalette(e.target.value)} style={styles.select}>
+                  <option value="default">Default</option>
+                  <option value="cyberpunk">Cyberpunk</option>
+                  <option value="retro">Retro</option>
+                </select>
+              </div>
+
+              <div style={styles.controlGroup}>
+                <label style={styles.label}>LIGHT ANGLE: {lightAngle}°</label>
+                <input type="range" min="0" max="360" value={lightAngle} onChange={(e) => setLightAngle(parseInt(e.target.value))} />
+              </div>
+
+              <div style={styles.controlGroup}>
+                <label style={styles.label}>ZOOM: {zoom.toFixed(1)}×</label>
+                <input type="range" min="0.5" max="4" step="0.1" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} />
+              </div>
+
+              <div style={{...styles.controlGroup, borderTop: '1px solid rgba(0,255,200,0.2)', paddingTop: '16px', marginTop: '8px'}}>
+                <label style={{...styles.label, color: '#00ff88'}}>⚡ OPTIMIZATIONS</label>
+              </div>
+
+              <div style={styles.toggleGroup}>
+                <button onClick={() => setUseHollow(!useHollow)} style={{...styles.toggleButton, ...(useHollow ? styles.toggleActive : {})}}>
+                  HOLLOW {useHollow ? 'ON' : 'OFF'}
+                </button>
+                <button onClick={() => setUseSymmetry(!useSymmetry)} style={{...styles.toggleButton, ...(useSymmetry ? styles.toggleActive : {}), ...(!stats.symmetric ? { opacity: 0.5 } : {})}} disabled={!stats.symmetric}>
+                  MIRROR {useSymmetry ? 'ON' : 'OFF'}
+                </button>
+              </div>
+
+              <div style={styles.toggleGroup}>
+                <button onClick={() => setShowFaces(!showFaces)} style={{...styles.toggleButton, ...(showFaces ? styles.toggleActive : {})}}>
+                  FACES {showFaces ? 'ON' : 'OFF'}
+                </button>
+                <button onClick={() => setWireframe(!wireframe)} style={{...styles.toggleButton, ...(wireframe ? styles.toggleActive : {})}}>
+                  WIREFRAME {wireframe ? 'ON' : 'OFF'}
+                </button>
+              </div>
+
+              <div style={styles.toggleGroup}>
+                <button onClick={() => setIsRotating(!isRotating)} style={{...styles.toggleButton, ...(isRotating ? styles.toggleActive : {})}}>
+                  AUTO-ROTATE {isRotating ? 'ON' : 'OFF'}
+                </button>
+                <button onClick={() => { setRotation({ x: -0.4, y: 0.5 }); setZoom(1.5); }} style={styles.toggleButton}>
+                  RESET VIEW
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('demo-root')).render(<VoxelProps initialResolution={16} autoRotate={true} />);
+  </script>
+</body>
+</html>
